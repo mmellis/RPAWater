@@ -3,7 +3,8 @@ Title: Functions for water models
 Version: 0.0.0.9000
 Authors@R: person("Martha", "Ellis", email = "martha.ellis@gmail.com", role = c("cre"))
 Description: What the package does (one paragraph).
-Depends: R (>= 3.5.0), dplyr, tidyr, ggplot2
+Depends: R (>= 3.5.0)
+Imports: dplyr, tidyr, ggplot2
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
