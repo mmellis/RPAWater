@@ -1,0 +1,586 @@
+# clear memory
+rm(list = ls())
+
+wd <- "D:/5_RPA_Water/RPA Water Model"
+
+library(nlme)
+
+# read in data
+
+year <- c(2005, 2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050, 2055, 2060,
+          2065, 2070, 2075, 2080, 2085, 2090, 2095, 2100)
+
+watershed <- c(14)
+
+sector <- c('dp', 'ic', 'thermo', 'irrig', 'livestock')
+
+scenario <- c('a1', 'a2', 'b2')
+
+popdataA1 <-  read.table("D:/5_RPA_Water/RPA Water Model/pop_A1_14.txt")
+rownames(popdataA1) <- watershed
+colnames(popdataA1) <- year
+
+popdataA2 <-  read.table("D:/5_RPA_Water/RPA Water Model/pop_A2_14.txt")
+rownames(popdataA2) <- watershed
+colnames(popdataA2) <- year
+
+popdataB2 <-  read.table("D:/5_RPA_Water/RPA Water Model/pop_B2_14.txt")
+rownames(popdataB2) <- watershed
+colnames(popdataB2) <- year
+
+# initial withdrawals - where do these numbers come from?
+wd0 <-  read.table("D:/5_RPA_Water/RPA Water Model/wd0_14.txt", header=TRUE)
+rownames(wd0)=watershed
+wd0
+
+# Notes on data:
+# Units: water in MGD unless stated otherwise. Fresh water only unless stated otherwise
+# (an exception, for example, is that total thermo kWhs are also listed, which includes salt water use).
+# Surface water + ground water. For 1985-1995 the numbers differ from what you get when you sum across
+# counties (assigning each county to a WRR). For year 2000 summation across counties was necessary,
+# as estimates were not provided for watersheds. For earlier years, water use and some other items
+# from Michelle's USE-ALL.WQ2, which gives numbers that in many cases do not agree with the USGS
+# circulars (apparently they were taken from computer files, and sometimes aggregated from smaller units).
+# Usually the difference is within 5%, but it can be considerably larger, especially for small amounts.
+# Differs from USE-WRX8.XLS: has I&C from circulars (not from Guldin's spreadsheet).
+
+# Beginning in 2000 with the Hutson et al. circular the USGS did not break down public supply
+# withdrawals into separate categories for domestic, industrial and commercial, and thermoelectric use.
+# To allow us to contiue to use the categories that were established in earlier circulars, we applied
+# percentages based on the 1995 data to the USGS public supply estimates for 2000 and 2005.
+
+# Note that in 2005 (the Kenny et al. circular) they did give the percent of total public supply
+# withdrawal that was for domentic use, but they lumped the rest (commerical, industrial, public
+# use and losses). I did not try to take advantage of this percentage, preferring to rely on the
+# 1995 percentages, in part because the 2005 circular did not even provide an estimate of total public
+# supply D&P (the provided only D, not P).
+
+# The livestock estimates for 1990 and 1995 are from the circulars, rather than from the aggregated
+# county or huc data, with the exception of WRR 9, which had some problematic zeros in the circular.
+# I made this change on 13 Jan 10 (at this point, I'm not sure which source would be better).
+
+##### Types of use #############
+#DP: Domestic and Public
+#IC: Industrial and Commercial
+#TF: Thermoelectric
+#IR: Irrigation
+#AQ: Aquaculture
+
+#### Domestic and Public ########
+
+# The general formula is withdrawal = units * wpu
+# where wpu is withdrawal per demand unit
+# relevant demand unit for domestic and public is population
+
+# ---- data ------
+
+# Growth and decay rates
+# Need to figure out how
+# to estimate these based on historic data
+g_eDP = -0.0066
+g_wDP = -0.0035
+d_eDP = -0.03
+d_wDP = -0.03
+
+num_years <- length(year)
+num_sheds <- length(watershed)
+num_scenarios <- length(scenario)
+
+# inital withdrawals per unit (gallons per capita per day)
+wd0_DP <- matrix((1:num_sheds), nrow=num_sheds)
+rownames(wd0_DP) <- watershed
+wd0_DP <- wd0[,1]
+
+# ---- end data ------------
+
+# ---- Domestic and Public ----
+
+wd_DP_all <- matrix((1:(num_years*num_scenarios)), nrow=num_scenarios)
+rownames(wp_DP_all) <- scenario
+colnames(wp_DP_all) <- year
+wd_DP_all
+
+# A1:
+
+pop <- popdataA1
+
+wpu_DP <- matrix((1:(num_years*num_sheds)), nrow=num_sheds)
+colnames(wpu_DP) <- year
+rownames(wpu_DP) <- watershed
+
+wd_DP <- matrix((1:(num_years*num_sheds)), nrow=num_sheds)
+colnames(wd_DP) <- year
+rownames(wd_DP) <- watershed
+
+wd_DP[,1] <- wd0_DP
+wpu_DP[,1] <- wd_DP[,1]/pop[,1]
+
+# the below works for the West. Need to do same for East
+for (n in 1:num_sheds) {
+  for (t in 2:num_years) {
+    wpu_DP[n,t] <- wpu_DP[n,t-1]*(1+g_wDP*(1+d_wDP)^(t*5))^5
+    wd_DP[n,t] <- wpu_DP[n,t]*pop[n,t]
+  } }
+
+wd_DP_all[1,] <- wd_DP
+wd_DP_all
+
+# A2:
+
+pop <- popdataA2
+
+wpu_DP <- matrix((1:(num_years*num_sheds)), nrow=num_sheds)
+colnames(wpu_DP) <- year
+rownames(wpu_DP) <- watershed
+
+wd_DP <- matrix((1:(num_years*num_sheds)), nrow=num_sheds)
+colnames(wd_DP) <- year
+rownames(wd_DP) <- watershed
+
+wd_DP[,1] <- wd0_DP
+wpu_DP[,1] <- wd_DP[,1]/pop[,1]
+
+# the below works for the West. Need to do same for East
+for (n in 1:num_sheds) {
+  for (t in 2:num_years) {
+    wpu_DP[n,t] <- wpu_DP[n,t-1]*(1+g_wDP*(1+d_wDP)^(t*5))^5
+    wd_DP[n,t] <- wpu_DP[n,t]*pop[n,t]
+  } }
+
+wd_DP_all[2,] <- wd_DP
+
+# B2:
+
+pop <- popdataB2
+
+wpu_DP <- matrix((1:(num_years*num_sheds)), nrow=num_sheds)
+colnames(wpu_DP) <- year
+rownames(wpu_DP) <- watershed
+
+wd_DP <- matrix((1:(num_years*num_sheds)), nrow=num_sheds)
+colnames(wd_DP) <- year
+rownames(wd_DP) <- watershed
+
+wd_DP[,1] <- wd0_DP
+wpu_DP[,1] <- wd_DP[,1]/pop[,1]
+
+# the below works for the West. Need to do same for East
+for (n in 1:num_sheds) {
+  for (t in 2:num_years) {
+    wpu_DP[n,t] <- wpu_DP[n,t-1]*(1+g_wDP*(1+d_wDP)^(t*5))^5
+    wd_DP[n,t] <- wpu_DP[n,t]*pop[n,t]
+  } }
+
+wd_DP_all[3,] <- wd_DP
+
+wd_DP_all
+
+## THIS IS NOT QUITE RIGHT
+per_capita_wd <- wpu_DP*1000000
+plot(year, per_capita_wd, type='l')
+
+
+
+
+
+
+
+
+annual_wd <- aggregate(usedata$dp.wd, by=list(Category=usedata$year), FUN=sum)
+annual_pop <- aggregate(usedata$pop, by=list(Category=usedata$year), FUN=sum)
+
+percapita <- (annual_wd*1000000) / annual_pop
+percapita
+
+# estimate growth rates for each division
+
+east <- subset(usedata, division == "east")
+west <- subset(usedata, division == "west")
+
+# - for the east:
+
+now.east <- subset(east, year > 1960)
+yest.east <- subset(east, year < 2005)
+
+ydata.e <- now.east$dp.wd / now.east$pop
+xdata.e <- yest.east$dp.wd / yest.east$pop
+time.e <- now.east$year - 1960
+
+plot(xdata.e,ydata.e)
+
+#choose starting values
+growth.e = 0.0037
+decay.e = -0.05
+
+fit.e = nls(ydata.e ~ xdata.e*(1+growth*(1+decay)^(time.e))^5,
+start=list(growth=growth.e,decay=decay.e))
+
+summary(fit.e)
+
+growth.dp.e = summary(fit.e)$coefficients[1]
+decay.dp.e = summary(fit.e)$coefficients[2]
+
+# draw fit
+plot(xdata.e,ydata.e)
+new.e = data.frame(xdata = seq(min(xdata.e),max(xdata.e),len=length(xdata.e)))
+lines(new.e$xdata,predict(fit.e,newdata=new.e))
+
+# plot residuals
+plot(ydata.e, resid(fit.e),col=east$wrr)
+
+### - calculate growth and decay rates for west - ###
+
+now.west <- subset(west, year > 1960)
+yest.west <- subset(west, year < 2005)
+
+ydata.w <- now.west$dp.wd / now.west$pop
+xdata.w <- yest.west$dp.wd / now.west$pop
+time.w <- now.west$year - 1960
+
+plot(xdata.w,ydata.w)
+
+#choose starting values
+growth.w = 0.004
+decay.w = 0.05
+
+fit.w <- nls(ydata.w ~ xdata.w*(1+growth*(1+decay)^(time.w))^5,
+start=list(growth=growth.w,decay=decay.w))
+
+summary(fit.w)
+
+growth.dp.w = summary(fit.w)$coefficients[1]
+decay.dp.w = summary(fit.w)$coefficients[2]
+
+# draw fit
+plot(xdata.w, ydata.w, col=now.west$wrr)
+new = data.frame(xdata = seq(min(xdata.w),max(xdata.w),len=length(xdata.w)))
+lines(new$xdata,predict(fit.w,newdata=new))
+
+
+
+#############Industrial and Commercial##########
+# g = growth rate
+g_wDP=-.0578
+g_eDP=-.0369
+
+# d = decay rate east and west
+d_wDP=-.042
+d_eDP=-.035
+
+#projected gallons thousand dollars capita per day (starting in year 2010)
+
+incomeA1=array(incomeA1)
+
+income_1401=array([incomeA1[:,0]])
+income_1402=array([incomeA1[:,1]])
+income_1403=array([incomeA1[:,2]])
+income_1501=array([incomeA1[:,3]])
+income_1502=array([incomeA1[:,4]])
+income_1503=array([incomeA1[:,5]])
+
+
+income_14=[income_1401, income_1402, income_1403]
+income_15=[income_1501, income_1502, income_1503]
+
+
+
+gpkd_IC_14=[2.2]
+for j in range(1,19):
+    i=j*5
+    gpkd_IC_14.append(gpkd_IC_14[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5) # i plus 5 is to line up with toms base 2005 year--really 2010 estimates should be added
+gpkd_IC_14=array([gpkd_IC_14])
+
+for withdraw14_IC in income_14:
+    withdraw14_IC=income_14*gpkd_IC_14#/1000000
+
+
+gpkd_IC_15=[1.97]
+for j in range(1,19):
+    i=j*5
+    gpkd_IC_15.append(gpkd_IC_15[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5) # i plus 5 is to line up with toms base 2005 year--really 2010 estimates should be added
+gpkd_IC_15=array([gpkd_IC_15])
+
+for withdraw15_IC in income_15:
+    withdraw15_IC=income_15*gpkd_IC_15#/1000000
+
+print(withdraw14_IC)
+print(withdraw15_IC)
+
+withdraw14_IC=squeeze(withdraw14_IC)
+withdraw14_IC.reshape(3,19)
+withdraw15_IC=squeeze(withdraw15_IC)
+withdraw15_IC.reshape(3,19)
+withdraw_IC=append(withdraw14_IC,withdraw15_IC)
+withdraw_IC=withdraw_IC.reshape(6,19)
+
+
+###Now include biofeuls through addition  delta_c=F*phi  where F is annual volume of fuel and phi is consumptive water use per fuel unit
+#all / non corn / corn / biodiesel / coal / other
+
+ethanol_wdcu=2
+biodiesel_wdcu=5
+coal_wdcu=2
+other_wdcu=2
+
+
+###
+biofuel=loadtxt("biofuelWDperCU.txt")
+biofuel=biofuel.transpose()
+popA1_WRR1_18=loadtxt("pop_A1_WRR1_18.txt")
+
+biofuel_noncorn=biofuel[0,:]*popA1.transpose()/popA1_WRR1_18
+
+
+
+
+#####biofuel corn
+biofuel_corn_multiplier_1401= [0]   ##not entirely clear how these multipliers are calculated
+biofuel_corn_multiplier_1402=[.00439]
+biofuel_corn_multiplier_1403=[0]
+biofuel_corn_multiplier_1501= [0]
+biofuel_corn_multiplier_1502=[0]
+biofuel_corn_multiplier_1503=[0]
+
+
+biofuel_corn_1401=biofuel_corn_multiplier_1401*biofuel[1,:]
+biofuel_corn_1402=biofuel_corn_multiplier_1402*biofuel[1,:]
+biofuel_corn_1403=biofuel_corn_multiplier_1403*biofuel[1,:]
+biofuel_corn_1501=biofuel_corn_multiplier_1501*biofuel[1,:]
+biofuel_corn_1502=biofuel_corn_multiplier_1502*biofuel[1,:]
+biofuel_corn_1503=biofuel_corn_multiplier_1503*biofuel[1,:]
+
+######biodiesel
+biodiesel_multiplier_1401= [0]   ##not entirely clear how these multipliers are calculated
+biodiesel_multiplier_1402=[0]
+biodiesel_multiplier_1403=[0]
+biodiesel_multiplier_1501= [0]
+biodiesel_multiplier_1502=[0]
+biodiesel_multiplier_1503=[0]
+
+
+biodiesel_1401=biodiesel_multiplier_1401*biofuel[2,:]
+biodiesel_1402=biodiesel_multiplier_1402*biofuel[2,:]
+biodiesel_1403=biodiesel_multiplier_1403*biofuel[2,:]
+biodiesel_1501=biodiesel_multiplier_1501*biofuel[2,:]
+biodiesel_1502=biodiesel_multiplier_1502*biofuel[2,:]
+biodiesel_1503=biodiesel_multiplier_1503*biofuel[2,:]
+
+#########coal
+coal_multiplier_1401= [.234]   ##not entirely clear how these multipliers are calculated
+coal_multiplier_1402=[0]
+coal_multiplier_1403=[.032]
+coal_multiplier_1501= [0]
+coal_multiplier_1502=[0]
+coal_multiplier_1503=[0]
+
+
+coal_1401=coal_multiplier_1401*biofuel[3,:]
+coal_1402=coal_multiplier_1402*biofuel[3,:]
+coal_1403=coal_multiplier_1403*biofuel[3,:]
+coal_1501=coal_multiplier_1501*biofuel[3,:]
+coal_1502=coal_multiplier_1502*biofuel[3,:]
+coal_1503=coal_multiplier_1503*biofuel[3,:]
+
+#########other  === biofuel estimate * ASRpop/WRRpop
+
+other=biofuel[4,:]*popA1.transpose()/popA1_WRR1_18
+
+#### all (sum all biofuels)
+
+biofuel_corn=[biofuel_corn_1401, biofuel_corn_1402, biofuel_corn_1403, biofuel_corn_1501 , biofuel_corn_1502, biofuel_corn_1503]
+biofuel_corn=array(biofuel_corn)
+
+biodiesel=[biodiesel_1401, biodiesel_1402, biodiesel_1403, biodiesel_1501, biodiesel_1502, biodiesel_1503]
+biodiesel=array(biodiesel)
+
+coal=[coal_1401, coal_1402, coal_1403, coal_1501, coal_1502, coal_1503]
+coal=array(coal)
+
+bio_all=biofuel_noncorn*other_wdcu+biofuel_corn*ethanol_wdcu+biodiesel*biodiesel_wdcu+coal*coal_wdcu
+
+##
+#withdraw_IC=array([withdraw14_IC, withdraw15_IC])
+
+withdraw_IC=withdraw_IC+bio_all
+
+################# THERMO  ####################
+#SEE SEPARATE FILE
+
+
+##################### IRRIGATION ##################
+#NUMBER OF ACRES
+# g = growth rate
+g_wDP=-.0021
+g_eDP=.0253
+
+# d = decay rate east and west (tom changed a few WRR's)
+d_wDP=-.01
+d_eDP=-.035
+
+irracre_1401=[607751]
+irracre_1402=[412983]
+irracre_1403=[218753]
+
+irracres_14=[irracre_1401, irracre_1402, irracre_1403]
+for irracre_14 in irracres_14:
+    for j in range(1,19):
+        i=j*5
+        irracre_14.append(irracre_14[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5)
+
+irracre_1501=[14261]
+irracre_1502=[315332]
+irracre_1503=[661792]
+
+irracres_15=[irracre_1501, irracre_1502, irracre_1503]
+for irracre_15 in irracres_15:
+    for j in range(1,19):
+        i=j*5
+        irracre_15.append(irracre_15[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5)
+
+print(irracres_14)
+print(irracres_15)
+
+#FT PER ACRE
+# g = growth rate   (tom changed a few WRR's from this general pattern pg 67 in technical report)
+g_wDP=-.0044
+g_eDP=0
+
+# d = decay rate east and west (tom changed a few WRR's)
+d_wDP=-.025
+d_eDP=0
+
+
+fpa_14=[5.83]
+fpa_15=[5.69]
+
+fpa_all=[fpa_14, fpa_15]
+
+
+for fpa in fpa_all:
+    for j in range(1,19):
+        i=j*5
+        fpa.append(fpa[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5) #differnt than Tom's, not sure why
+
+fpa_all=array(fpa_all)
+fpa_14=fpa_all[0,:]
+fpa_15=fpa_all[1,:]
+
+
+withdraw14_IR=irracres_14*fpa_14/1120.1
+withdraw15_IR=irracres_15*fpa_15/1120.1
+
+#project future withdrawals ( acre ft converted to million gallons) (starting in 2010)
+#irracre_IR=array(irracre)
+#fpa_IR=array(fpa)
+#wdrawIR=irracre_IR.transpose()*fpa_IR/1120.1
+
+savetxt('output1', fpa_14, delimiter=',')
+
+
+################# THERMO  ####################
+# g = growth rate electricity consumption per capita
+w_g_cons_per_cap=.0037
+e_g_cons_per_cap=.0037
+
+# d = decay rate electricity consumption per capita
+w_d_cons_per_cap=-.05
+e_d_cons_per_cap=-.05
+
+# g = growth rate other renewable elec production
+w_g_renew_res_cap=.0265
+e_g_renew_res_cap=.0265
+
+# d = decay rate other renewable elec production
+w_d_renew_res_cap=-.03
+e_d_renew_res_cap=-.03
+
+
+
+# g = growth rate other renewable elec production
+w_g_renew_res_cap=.0265
+e_g_renew_res_cap=.0265
+
+
+# g = growth rate in irrigated area
+g_wDP=-.0021
+g_eDP=.0253
+
+# d = decay rate in irrigated area
+d_wDP=-.01
+d_eDP=-.035
+
+
+###consumption per capita vector
+cons_per_cap_1401=[607751]
+cons_per_cap_1402=[412983]
+cons_per_cap_1403=[218753]
+
+cons_per_cap_14=[cons_per_cap_1401, cons_per_cap_1402, cons_per_cap_1403]
+for e_cons_14 in cons_per_cap_14:
+    for j in range(1,19):
+        i=j*5
+        e_cons_14.append(e_cons_14[j-1]*(1+(w_g_cons_per_cap*(1+w_d_cons_per_cap)**(i+5)))**5)
+
+cons_per_cap_1501=[14261]
+cons_per_cap_1502=[315332]
+cons_per_cap_1503=[661792]
+
+cons_per_cap_15=[cons_per_cap_1501, cons_per_cap_1502, cons_per_cap_1503]
+for e_cons_15 in cons_per_cap_15:
+    for j in range(1,19):
+        i=j*5
+        e_cons_15.append(e_cons_15[j-1]*(1+(w_g_cons_per_cap*(1+w_d_cons_per_cap)**(i+5)))**5)
+
+### other renewable energy production vector
+
+
+
+###irrigated land vector
+
+irracre_1401=[607751]
+irracre_1402=[412983]
+irracre_1403=[218753]
+
+irracres_14=[irracre_1401, irracre_1402, irracre_1403]
+for irracre_14 in irracres_14:
+    for j in range(1,19):
+        i=j*5
+        irracre_14.append(irracre_14[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5)
+
+irracre_1501=[14261]
+irracre_1502=[315332]
+irracre_1503=[661792]
+
+irracres_15=[irracre_1501, irracre_1502, irracre_1503]
+for irracre_15 in irracres_15:
+    for j in range(1,19):
+        i=j*5
+        irracre_15.append(irracre_15[j-1]*(1+(g_wDP*(1+d_wDP)**(i+5)))**5)
+
+
+
+
+
+
+#############Combine and OUPUT#############
+#CHeck list: do they match Tom's?
+# D&P       #   CHECK
+# I&C       #   CHECK
+# Thermo    #
+# Irrig.    #   JUST OFF
+# Livestock #
+
+
+
+
+
+
+####GRAPHS######
+#from matplotlib.pyplot import *
+
+
+#year=linspace(2010,2100,19)
+#plot(year, withdraw14_IR[1,:], year, withdraw15_IR[1,:])
+#xlabel('Year')
+#ylabel('Irrigation Withdrawals')
+#show()

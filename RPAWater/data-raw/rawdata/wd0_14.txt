@@ -1,0 +1,2 @@
+	dp	ic	thermo	irrig	livestock
+14	151	72	170	6447	123
