@@ -60,7 +60,7 @@ calcWD<-function(dF, yr1=2010){
 ################################################################################
 ################################################################################
 
-projClimate<-function(dF){
+projClimate<-function(yr1=2010){
   eta_precip <- 1.415
   eta_et <- 0.778
   
@@ -69,15 +69,15 @@ projClimate<-function(dF){
   dF<- climate %>% group_by(model, ASR) %>% 
       mutate(wpu_climate=ifelse(year==yr1, 0,
         eta_precip * 6 * ((precipdata[1]-precipdata)/6 + 
-               0.016*((precipdata/6)^2-(precipdata/6)^2)) )) +
-         eta_et * ((etdata-etdata[1])*365/10)
+               0.016*((precipdata/6)^2-(precipdata/6)^2))  +
+         eta_et * ((etdata-etdata[1])*365/10) ))
   return(dF)
 }
 
 ################################################################################
 ################################################################################
 
-projectWater<-function(year=NULL, watershed=NULL, sector=NULL, scenario=NULL, model=NULL){
+projWater<-function(year=NULL, watershed=NULL, sector=NULL, scenario=NULL, model=NULL){
   if(is.null(year)) 
     year <- c(2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050, 2055, 2060,
             2065, 2070, 2075, 2080, 2085, 2090, 2095, 2100)
@@ -107,6 +107,29 @@ projectWater<-function(year=NULL, watershed=NULL, sector=NULL, scenario=NULL, mo
   wd<- calcWD(wd) 
   
   return(wd)
+}
+
+################################################################################
+################################################################################
+
+plotWaterProjections<-function(dF=NULL){
+  if(is.null(dF)) dF<-projWater()
+ message('Climate models not yet implemented')
+  p0<-ggplot(dF, aes(x=year, y=wd, colour=scenario, group=interaction(ASR,scenario)))+
+    geom_line()+facet_grid(sector~model,scales='free_y')
+  print(p0)
+  return(invisible(p0)) 
+}
+
+################################################################################
+################################################################################
+
+plotClimateProjections<-function(dF=NULL){
+  if(is.null(dF)) dF<-projClimate() 
+  p0<-ggplot(projClimate(), aes(x=year, y=wpu_climate, group=ASR))+
+    geom_line()+facet_grid(sector~model)
+  print(p0)
+  return(invisible(p0)) 
 }
 
 ################################################################################
