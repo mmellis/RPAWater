@@ -61,7 +61,7 @@ d_eIC = -0.0350
 d_wIC = -0.0420
 
 gd_rates<-data.frame(region=rep(c('East','West'),length.out=4),
-                     sector=rep(c('dp','ic'), each=2),
+                     sector=factor(rep(c('dp','ic'), each=2),levels=sector),
                      g=c(g_eDP, g_wDP,g_eIC, g_wIC),
                      d=c(d_eDP, d_wDP,d_eIC, d_wIC))
 save(gd_rates,file=paste0(save_to, 'gd_rates.rdata'))                     
