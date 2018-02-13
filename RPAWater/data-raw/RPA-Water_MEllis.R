@@ -26,7 +26,6 @@ num_sheds <- length(watershed)
 num_scenarios <- length(scenario)
 num_models <- length(model)
 
-
 source('RPA-PopData.R')
 
 ### Drivers ####################################################################
@@ -48,23 +47,6 @@ inc<-gather(inc, "year", "inc",-c(1:2) )
 drivers<-full_join(pop,inc)
 save(drivers, file=paste0(save_to,'drivers.rdata'))
 
-### Initial water demand #######################################################
-yr1<-2010  
-wd2010<-data.frame(WRR=as.numeric(substr(row.names(wd0),1,2)), ASR=as.numeric(row.names(wd0)), wd0)
-  wd2010<-gather(wd2010, 'sector', 'wd', -c(1:2) )
-  wd2010$sector<-factor(wd2010$sector, levels=sector)  
-
-# Empty dataframe for water demand projections  
-wd<-expand.grid(year=year, ASR=watershed,
-  sector=sector,scenario=scenario, model=model)
-  wd<-left_join(wd,drivers, by=c('ASR','scenario','year')) %>% 
-        mutate(driver=ifelse(sector=='dp', pop,
-                      ifelse(sector=='ic', inc, NA))) %>%
-        select(-(pop:inc))  
-  wd<-left_join(wd,data.frame(year=yr1, wd2010), by=c('year','ASR','sector'))
-    wd<- wd %>% mutate(WRR=floor(ASR*1e-2)) %>% select(year, WRR, ASR:wd)
-  
-
 ### Growth and decay rates #####################################################
 # Need to figure out how
 # to estimate these based on historic data
@@ -83,6 +65,26 @@ gd_rates<-data.frame(region=rep(c('East','West'),length.out=4),
                      g=c(g_eDP, g_wDP,g_eIC, g_wIC),
                      d=c(d_eDP, d_wDP,d_eIC, d_wIC))
 save(gd_rates,file=paste0(save_to, 'gd_rates.rdata'))                     
+
+
+### Initial water demand #######################################################
+yr1<-2010  
+wd2010<-data.frame(WRR=as.numeric(substr(row.names(wd0),1,2)), ASR=as.numeric(row.names(wd0)), wd0)
+  wd2010<-gather(wd2010, 'sector', 'wd', -c(1:2) )
+  wd2010$sector<-factor(wd2010$sector, levels=sector)  
+save(wd2010,file=paste0(save_to, 'wd2010.rdata'))
+
+## Empty dataframe for water demand projections  
+#wd<-expand.grid(year=year, ASR=watershed,
+#  sector=sector,scenario=scenario, model=model)
+#  wd<-left_join(wd,drivers, by=c('ASR','scenario','year')) %>% 
+#        mutate(driver=ifelse(sector=='dp', pop,
+#                      ifelse(sector=='ic', inc, NA))) %>%
+#        select(-(pop:inc))  
+#  wd<-left_join(wd,data.frame(year=yr1, wd2010), by=c('year','ASR','sector'))
+#    wd<- wd %>% mutate(WRR=floor(ASR*1e-2)) %>% select(year, WRR, ASR:wd)
+#  
+
 
 # Notes on data:
 # Units: water in MGD unless stated otherwise. Fresh water only unless stated otherwise
@@ -121,18 +123,18 @@ save(gd_rates,file=paste0(save_to, 'gd_rates.rdata'))
 # where wpu is withdrawal per demand unit
 
 
-# Initial values for 2010                                          
-wd <- wd %>% group_by(sector, scenario, model, year, WRR) %>% 
-  mutate(wpu=sum(wd)/sum(driver)*1e6 ) %>% ungroup()
-
-# Calculate WPU by WRR  
-wd <- wd %>% group_by(sector, scenario, model, ASR) %>%
-  mutate(fc=ifelse(year>yr1,((1+g_wDP*(1+d_wDP)^(year-yr1))^5),1), 
-  wpu=wpu[1]*cumprod(fc)) %>% select(-fc)
-  
-# Calculate water demand for each scenario  
-wd<- wd %>%  mutate(wd=ifelse(year>yr1, wpu*driver/1e6, wd)) ##doesn't match a2,b2 due to initial pop in wpu calcs
-
+## Initial values for 2010                                          
+#wd <- wd %>% group_by(sector, scenario, model, year, WRR) %>% 
+#  mutate(wpu=sum(wd)/sum(driver)*1e6 ) %>% ungroup()
+#
+## Calculate WPU by WRR  
+#wd <- wd %>% group_by(sector, scenario, model, ASR) %>%
+#  mutate(fc=ifelse(year>yr1,((1+g_wDP*(1+d_wDP)^(year-yr1))^5),1), 
+#  wpu=wpu[1]*cumprod(fc)) %>% select(-fc)
+#  
+## Calculate water demand for each scenario  
+#wd<- wd %>%  mutate(wd=ifelse(year>yr1, wpu*driver/1e6, wd)) ##doesn't match a2,b2 due to initial pop in wpu calcs
+#
 
 ### CLIMATE EFFECTS ############################################################
 eta_precip <- 1.415
@@ -154,6 +156,7 @@ climate<-full_join(precipdata, etdata)
   climate$year<-as.numeric(substr(climate$year,2,5))
   climate$sector<-factor('dp', levels=levels(wd$sector))
   climate$wpu_climate <- 0
+save(climate,file=paste0(save_to, 'climate.rdata'))
 
 # Calculate wpu under climate scenarios
 climate <- climate %>% group_by(model, ASR) %>% 
@@ -162,6 +165,7 @@ climate <- climate %>% group_by(model, ASR) %>%
                0.016*((precipdata/6)^2-(precipdata/6)^2)) )) +
          eta_et * ((etdata-etdata[1])*365/10)
     rm(precipdata, etdata)
+
 
 # Calculate total water demand with climate
 wd <- left_join(wd, select(climate, -(precipdata:etdata))) %>%
