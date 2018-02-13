@@ -6,3 +6,5 @@ R CMD INSTALL RPAWater
 install.packages("C:/Users/martha.ellis/Documents/GitHub/RPAWater/RPAWater_0.0.0.9000.tar.gz, repos=NULL, type='source')
 
 detach("package:RPAWater", unload=TRUE)
+
+R CMD Rd2pdf RPAWater --force
