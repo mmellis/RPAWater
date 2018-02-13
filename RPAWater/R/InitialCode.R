@@ -32,28 +32,27 @@ addInitialValues<-function(dF, yr1=2010){
 getGDrate<-function(ASR, sect){
   data(gd_rates)
   R<-ifelse(ASR %in% c(1401,1402,1403,1501,1502,1503), 'West','East')
-  gd<-right_join(gd_rates, data.frame(region=R, sector=sect))[,c('g','d')]
-  return(gd)
+  wch<-match(paste(R,sect), paste(gd_rates$region, gd_rates$sector))
+  return(gd_rates[wch,c('g','d')])
   }   
   
 ################################################################################
 ################################################################################
 
 calcWPU<-function(dF, yr1=2010){
-   data(gd_rates)
    dF<-dF %>% group_by(sector, scenario, model, ASR) %>%
     mutate(
-      g=getGDrate(ASR, sector)[,2],
+      g=getGDrate(ASR, sector)[,1],
       d=getGDrate(ASR, sector)[,2],
-      fc=ifelse(year>yr1,((1+g*(1+d)^(year-yr1))^5),1)), 
-    wpu=wpu[1]*cumprod(fc)) %>% select(-fc)
+      fc=ifelse(year>yr1,((1+g*(1+d)^(year-yr1))^5),1), 
+    wpu=wpu[1]*cumprod(fc)) %>% select(-fc,-g,-d)
     return(dF) 
 }    
 
 ################################################################################
 ################################################################################
 
-calcWD<-function(dF){
+calcWD<-function(dF, yr1=2010){
   dF<- dF %>%  mutate(wd=ifelse(year>yr1, wpu*driver/1e6, wd))
   return(dF)
 }
