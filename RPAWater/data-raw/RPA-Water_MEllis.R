@@ -29,19 +29,21 @@ num_models <- length(model)
 source('RPA-PopData.R')
 
 ### Drivers ####################################################################
-# Dataframe with population data
-pop<-rbind(data.frame(ASR=as.numeric(row.names(popdataA1)),scenario='a1b', popdataA1), 
-           data.frame(ASR=as.numeric(row.names(popdataA2)),scenario='a2', popdataA2), 
-           data.frame(ASR=as.numeric(row.names(popdataB2)),scenario='b2', popdataB2))
-pop<-gather(pop, "year", "pop",-c(1:2) ) 
-  pop$year<-as.numeric(substr(pop$year, 2,5))
+## Dataframe with population data
+#pop<-rbind(data.frame(ASR=as.numeric(row.names(popdataA1)),scenario='a1b', popdataA1), 
+#           data.frame(ASR=as.numeric(row.names(popdataA2)),scenario='a2', popdataA2), 
+#           data.frame(ASR=as.numeric(row.names(popdataB2)),scenario='b2', popdataB2))
+#pop<-gather(pop, "year", "pop",-c(1:2) ) 
+#  pop$year<-as.numeric(substr(pop$year, 2,5))
+#
+## Dataframe with income data
+#inc<-rbind(data.frame(ASR=as.numeric(row.names(incdataA1)),scenario='a1b', incdataA1), 
+#           data.frame(ASR=as.numeric(row.names(incdataA2)),scenario='a2', incdataA2), 
+#           data.frame(ASR=as.numeric(row.names(incdataB2)),scenario='b2', incdataB2))
+#inc<-gather(inc, "year", "inc",-c(1:2) ) 
+#  inc$year<-as.numeric(substr(inc$year, 2,5))
 
-# Dataframe with income data
-inc<-rbind(data.frame(ASR=as.numeric(row.names(incdataA1)),scenario='a1b', incdataA1), 
-           data.frame(ASR=as.numeric(row.names(incdataA2)),scenario='a2', incdataA2), 
-           data.frame(ASR=as.numeric(row.names(incdataB2)),scenario='b2', incdataB2))
-inc<-gather(inc, "year", "inc",-c(1:2) ) 
-  inc$year<-as.numeric(substr(inc$year, 2,5))
+pop<-read.csv("rawdata/pop_A1B_crb.txt")
   
 # Combining drivers across sectors into one dataframe
 drivers<-full_join(pop,inc)
