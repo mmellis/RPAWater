@@ -3,18 +3,19 @@ library(dplyr)
 library(tidyr)
 
 # Input initial values dataframe
-init<-read.csv('rawdata/RPAWaterInputs.csv', na.strings=c('-'))
+init<-read.csv('rawdata/RPAWaterInputs.csv', na.strings=c('NA','-', '#VALUE!', '#DIV/0!'))
    names(init)<-tolower(names(init))
    names(init)<-gsub('perunit', 'wpu', names(init))
-   names(init)<-sub('inc.in.thousands','inc',names(init))
+   names(init)<-sub('inc.in.millions','inc',names(init))
+   names(init)<-sub('acresirrig','acres',names(init))
 
       
 # Input drivers
-pop<-read.csv("rawdata/Popdata.csv")
+pop<-read.csv("rawdata/Popdata.csv"); stopifnot(!any(sapply(pop[,-1],is.factor)))
 pop<-gather(pop, "year", "pop",-c(1:2) ) 
   pop$year<-as.numeric(substr(pop$year, 8,11))
 
-inc<-read.csv("rawdata/Incdata.csv")
+inc<-read.csv("rawdata/Incdata.csv"); stopifnot(!any(sapply(inc[,-1],is.factor)))
 inc<-gather(inc, "year", "inc",-c(1:2) ) 
   inc$year<-as.numeric(substr(inc$year, 9,12))
 
@@ -26,11 +27,18 @@ subset(drivers, fips=='1001' & year==2015)
 
 scaleI<-median(floor(log10(init$pop)),na.rm=T)
 scaleD<-median(floor(log10(subset(drivers, year==2015)$pop)))
-  init$pop<-init$pop*10^(scaleD-scaleI)
+  stopifnot(scaleI==scaleD)
+#  init$pop<-init$pop*10^(scaleD-scaleI)
+
 
 scaleI<-median(floor(log10(init$inc)),na.rm=T)
 scaleD<-median(floor(log10(subset(drivers, year==2015)$inc)))
-  init$inc<-init$inc*10^(scaleD-scaleI) ### SOMETHING IS AMISS HERE!!!
+  stopifnot(scaleI==scaleD)
+#  init$inc<-init$inc*10^(scaleD-scaleI) ### SOMETHING IS AMISS HERE!!!
+
+# income is in per capita personal income for projections, but possibly 
+  # total income for init data
+  init$inc<-init$inc/init$pop
 
 
 # Pull projection values from initial and drivers dataframes                           
@@ -65,7 +73,7 @@ wd <- addDrivers(wd, drivers)
 
 # This function addInitialValues does XXXXXXX 
 #    -> adds initial driver value and wpu to projection DF
-addInitalValues <- function (projdF, initDF) 
+addInitalValues <- function (projDF, initDF) 
 {
   #browser()
   init.drivers<-select(initDF, c('fips','year', 'pop', 'inc'))  %>%
@@ -95,7 +103,7 @@ wd<-addInitalValues (wd, init)
 calcWPU <- function (projDF, initDF) 
 {
   #browser()
-  init.rates<-select(init, 'fips','year',contains('growth'), contains('decay')) %>%
+  init.rates<-select(initDF, 'fips','year',contains('growth'), contains('decay')) %>%
                   gather('sector','rate', -(1:2)) %>%
                   separate(sector, into=c('sector','sig')) %>%
                   spread(sig, rate)
@@ -119,4 +127,5 @@ calcWD <- function (dF)
   return(dF)
 } 
 
-wd<-calcWD(wd)                                             
+wd<-calcWD(wd)   
+                                         
