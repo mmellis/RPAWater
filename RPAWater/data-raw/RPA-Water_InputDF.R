@@ -3,9 +3,120 @@ library(dplyr)
 library(tidyr)
 
 # Input initial values dataframe
-init<-read.csv('rawdata/RPAWaterInputs.csv')
-   yr1<-unique(init$year); stopifnot(length(yr1)>1)
-   
-   
+init<-read.csv('rawdata/RPAWaterInputs.csv', na.strings=c('-'))
+   names(init)<-tolower(names(init))
+   names(init)<-gsub('perunit', 'wpu', names(init))
+   names(init)<-sub('inc.in.thousands','inc',names(init))
+
+      
 # Input drivers
-   
+pop<-read.csv("rawdata/Popdata.csv")
+pop<-gather(pop, "year", "pop",-c(1:2) ) 
+  pop$year<-as.numeric(substr(pop$year, 8,11))
+
+inc<-read.csv("rawdata/Incdata.csv")
+inc<-gather(inc, "year", "inc",-c(1:2) ) 
+  inc$year<-as.numeric(substr(inc$year, 9,12))
+
+drivers<-full_join(pop,inc); rm(pop,inc)
+
+# Match scales for initial and drivers data
+subset(init, fips=='1001')[, c('pop','inc')]
+subset(drivers, fips=='1001' & year==2015)
+
+scaleI<-median(floor(log10(init$pop)),na.rm=T)
+scaleD<-median(floor(log10(subset(drivers, year==2015)$pop)))
+  init$pop<-init$pop*10^(scaleD-scaleI)
+
+scaleI<-median(floor(log10(init$inc)),na.rm=T)
+scaleD<-median(floor(log10(subset(drivers, year==2015)$inc)))
+  init$inc<-init$inc*10^(scaleD-scaleI) ### SOMETHING IS AMISS HERE!!!
+
+
+# Pull projection values from initial and drivers dataframes                           
+   init.yr<-unique(init$year); stopifnot(length(init.yr)==1)
+
+   proj.yrs<-sort(unique(drivers$year))
+   proj.scenario<-unique(drivers$scenario)
+   proj.model<-NA
+
+   both.fips<-intersect(init$fips, drivers$fips)
+   both.sector<-c('dp','ic')
+
+# Create empty df for projections
+wd <- expand.grid(year     = c(init.yr, proj.yrs), 
+                  fips     = both.fips, 
+                  sector   = both.sector, 
+                  scenario = proj.scenario, 
+                  model    = proj.model)
+                  
+# This function addDrivers does XXXXXX -> adds driver data to projection DF
+addDrivers <- function (projDF, driverDF) 
+{
+  #browser()
+  projDF <- left_join(projDF, driverDF, by = c("fips", "scenario", "year")) %>% 
+    mutate(driver = ifelse(sector == "dp", pop, 
+                    ifelse(sector == "ic", inc, NA))) %>% 
+    select(-(pop:inc))
+  return(projDF)
+}
+
+wd <- addDrivers(wd, drivers)
+
+# This function addInitialValues does XXXXXXX 
+#    -> adds initial driver value and wpu to projection DF
+addInitalValues <- function (projdF, initDF) 
+{
+  #browser()
+  init.drivers<-select(initDF, c('fips','year', 'pop', 'inc'))  %>%
+                 gather('sector', 'driver', pop:inc)          %>%
+                   mutate(sector = ifelse(sector == "pop", "dp", 
+                    ifelse(sector == "inc", "ic", NA)))
+
+  projDF<- left_join(projDF, init.drivers, by = c("year", "fips","sector")) %>%
+              mutate(driver=coalesce(driver.x, driver.y)) %>%
+              select(-driver.x, -driver.y)
+                     
+  init.wpu<-select(initDF, "year", "fips", ends_with('wpu')) %>%
+               gather('sector','wpu', -(1:2))              %>%
+               mutate(sector=gsub('.wpu','',sector))
+               
+  projDF<-left_join(projDF, init.wpu)
+  
+  return(projDF)
+}
+
+wd<-addInitalValues (wd, init)
+
+
+# This function calcWPU 
+# -> inputs growth and decay rates from initial DF
+# -> calculates withdrawals per unit trends for all sectors
+calcWPU <- function (projDF, initDF) 
+{
+  #browser()
+  init.rates<-select(init, 'fips','year',contains('growth'), contains('decay')) %>%
+                  gather('sector','rate', -(1:2)) %>%
+                  separate(sector, into=c('sector','sig')) %>%
+                  spread(sig, rate)
+  
+  projDF <- left_join(projDF, init.rates) %>% 
+        group_by(sector, scenario, model, fips) %>%
+        mutate(fc = ifelse(year > min(year),
+                   ((1 + growth[1] * (1 + decay[1])^(year - min(year)))^5), 1), 
+           wpu = wpu[1] * cumprod(fc)) %>% 
+    select(-fc, -growth, -decay)
+  return(projDF)
+}
+
+wd<-calcWPU(wd, init)  
+
+# This function calcWD does XXXXXX
+# -> calculates wd from wpu and driver data
+calcWD <- function (dF) 
+{
+  dF <- dF %>% mutate(wd = wpu * driver)
+  return(dF)
+} 
+
+wd<-calcWD(wd)                                             
